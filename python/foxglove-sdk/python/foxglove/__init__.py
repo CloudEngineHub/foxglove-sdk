@@ -13,8 +13,8 @@ from . import _foxglove_py as _foxglove
 
 # Re-export these imports
 from ._foxglove_py import (
+    ChannelDescriptor,
     Context,
-    FilterableChannel,
     Schema,
     SinkChannelFilter,
     open_mcap,
@@ -130,8 +130,8 @@ def _level_names() -> dict[str, int]:
 
 __all__ = [
     "Channel",
+    "ChannelDescriptor",
     "Context",
-    "FilterableChannel",
     "MCAPWriter",
     "Schema",
     "SinkChannelFilter",
