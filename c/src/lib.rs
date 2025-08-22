@@ -21,6 +21,7 @@ mod tests;
 mod util;
 pub use generated_types::*;
 mod bytes;
+mod channel_descriptor;
 mod connection_graph;
 mod fetch_asset;
 mod logging;
@@ -29,6 +30,7 @@ mod service;
 mod sink_channel_filter;
 use sink_channel_filter::ChannelFilter;
 
+use channel_descriptor::FoxgloveChannelDescriptor;
 use parameter::FoxgloveParameterArray;
 
 /// A key-value pair of strings.
@@ -1033,16 +1035,6 @@ pub unsafe extern "C" fn foxglove_mcap_close(
     unsafe { result_to_c(result, std::ptr::null_mut()) }
 }
 
-/// Information about a Channel.
-#[repr(C)]
-pub struct FoxgloveChannelDescriptor {
-    pub topic: FoxgloveString,
-    pub encoding: FoxgloveString,
-    pub schema_name: FoxgloveString,
-    pub schema_encoding: FoxgloveString,
-    pub metadata: *const FoxgloveChannelMetadata,
-}
-
 pub struct FoxgloveChannel(foxglove::RawChannel);
 
 /// Create a new channel. The channel must later be freed with `foxglove_channel_free`.
@@ -1235,7 +1227,8 @@ pub extern "C" fn foxglove_channel_get_message_encoding(
 /// `channel` must be a valid pointer to a `foxglove_channel` created via `foxglove_channel_create`.
 /// `schema` must be a valid pointer to a `FoxgloveSchema` struct that will be filled in.
 ///
-/// The returned value is valid only for the lifetime of the channel.
+/// The returned value is valid only for the lifetime of the channel, which is typically the
+/// duration of a callback where a descriptor is passed.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn foxglove_channel_get_schema(
     channel: Option<&FoxgloveChannel>,

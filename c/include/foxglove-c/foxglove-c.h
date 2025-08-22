@@ -274,6 +274,8 @@ typedef uint8_t foxglove_server_status_level;
 
 typedef struct foxglove_channel foxglove_channel;
 
+typedef struct foxglove_channel_descriptor foxglove_channel_descriptor;
+
 typedef struct foxglove_connection_graph foxglove_connection_graph;
 
 typedef struct foxglove_context foxglove_context;
@@ -536,45 +538,6 @@ typedef struct foxglove_server_callbacks {
 
 typedef uint8_t foxglove_server_capability;
 
-/**
- * A key-value pair of strings.
- */
-typedef struct foxglove_key_value {
-  /**
-   * The key
-   */
-  struct foxglove_string key;
-  /**
-   * The value
-   */
-  struct foxglove_string value;
-} foxglove_key_value;
-
-/**
- * A collection of metadata items for a channel.
- */
-typedef struct foxglove_channel_metadata {
-  /**
-   * The items in the metadata collection.
-   */
-  const struct foxglove_key_value *items;
-  /**
-   * The number of items in the metadata collection.
-   */
-  size_t count;
-} foxglove_channel_metadata;
-
-/**
- * Information about a Channel.
- */
-typedef struct foxglove_channel_descriptor {
-  struct foxglove_string topic;
-  struct foxglove_string encoding;
-  struct foxglove_string schema_name;
-  struct foxglove_string schema_encoding;
-  const struct foxglove_channel_metadata *metadata;
-} foxglove_channel_descriptor;
-
 typedef struct foxglove_server_options {
   /**
    * `context` can be null, or a valid pointer to a context created via `foxglove_context_new`.
@@ -683,6 +646,34 @@ typedef struct foxglove_schema {
   const uint8_t *data;
   size_t data_len;
 } foxglove_schema;
+
+/**
+ * A key-value pair of strings.
+ */
+typedef struct foxglove_key_value {
+  /**
+   * The key
+   */
+  struct foxglove_string key;
+  /**
+   * The value
+   */
+  struct foxglove_string value;
+} foxglove_key_value;
+
+/**
+ * A collection of metadata items for a channel.
+ */
+typedef struct foxglove_channel_metadata {
+  /**
+   * The items in the metadata collection.
+   */
+  const struct foxglove_key_value *items;
+  /**
+   * The number of items in the metadata collection.
+   */
+  size_t count;
+} foxglove_channel_metadata;
 
 /**
  * An iterator over channel metadata key-value pairs.
@@ -1948,6 +1939,14 @@ typedef struct foxglove_raw_image {
 } foxglove_raw_image;
 
 /**
+ * An iterator over a channel descriptor's metadata key-value pairs.
+ */
+typedef struct foxglove_channel_descriptor_metadata_iterator {
+  const struct foxglove_channel_descriptor *channel;
+  size_t index;
+} foxglove_channel_descriptor_metadata_iterator;
+
+/**
  * A byte array with associated length.
  */
 typedef struct foxglove_bytes {
@@ -2253,7 +2252,8 @@ struct foxglove_string foxglove_channel_get_message_encoding(const struct foxglo
  * `channel` must be a valid pointer to a `foxglove_channel` created via `foxglove_channel_create`.
  * `schema` must be a valid pointer to a `FoxgloveSchema` struct that will be filled in.
  *
- * The returned value is valid only for the lifetime of the channel.
+ * The returned value is valid only for the lifetime of the channel, which is typically the
+ * duration of a callback where a descriptor is passed.
  */
 foxglove_error foxglove_channel_get_schema(const struct foxglove_channel *channel,
                                            struct foxglove_schema *schema);
@@ -3203,6 +3203,83 @@ foxglove_error foxglove_channel_log_vector3(const struct foxglove_channel *chann
                                             const struct foxglove_vector3 *msg,
                                             const uint64_t *log_time,
                                             FoxgloveSinkId sink_id);
+
+/**
+ * Get the topic of a channel descriptor.
+ *
+ * # Safety
+ * `channel` must be a valid pointer to a `foxglove_channel_descriptor`.
+ *
+ * If the passed channel is null, an empty value is returned.
+ *
+ * The returned value is valid only for the lifetime of the channel, which is typically the
+ * duration of a callback where a descriptor is passed.
+ */
+struct foxglove_string foxglove_channel_descriptor_get_topic(const struct foxglove_channel_descriptor *channel);
+
+/**
+ * Get the message_encoding of a channel descriptor.
+ *
+ * # Safety
+ * `channel` must be a valid pointer to a `foxglove_channel_descriptor`.
+ *
+ * If the passed channel is null, an empty value is returned.
+ *
+ * The returned value is valid only for the lifetime of the channel, which is typically the
+ * duration of a callback where a descriptor is passed.
+ */
+struct foxglove_string foxglove_channel_descriptor_get_message_encoding(const struct foxglove_channel_descriptor *channel);
+
+/**
+ * Get the schema of a channel.
+ *
+ * If the passed channel is null or has no schema, returns `FoxgloveError::ValueError`.
+ *
+ * # Safety
+ * `channel` must be a valid pointer to a `foxglove_channel_descriptor`.
+ * `schema` must be a valid pointer to a `FoxgloveSchema` struct that will be filled in.
+ *
+ * The returned value is valid only for the lifetime of the channel, which is typically the
+ * duration of a callback where a descriptor is passed.
+ */
+foxglove_error foxglove_channel_descriptor_get_schema(const struct foxglove_channel_descriptor *channel,
+                                                      struct foxglove_schema *schema);
+
+/**
+ * Create an iterator over a channel descriptor's metadata.
+ *
+ * You must later free the iterator using foxglove_channel_descriptor_metadata_iter_free.
+ *
+ * Iterate items using foxglove_channel_descriptor_metadata_iter_next.
+ *
+ * # Safety
+ * `channel` must be a valid pointer to a `foxglove_channel_descriptor`.
+ * The channel descriptor must remain valid for the lifetime of the iterator.
+ */
+struct foxglove_channel_descriptor_metadata_iterator *foxglove_channel_descriptor_metadata_iter_create(const struct foxglove_channel_descriptor *channel);
+
+/**
+ * Get the next key-value pair from the metadata iterator.
+ *
+ * Returns true if a pair was found and stored in `key_value`, false if the iterator is exhausted.
+ *
+ * # Safety
+ * `iter` must be a valid pointer to a `foxglove_channel_descriptor_metadata_iterator` created via
+ * `foxglove_channel_descriptor_metadata_iter_create`.
+ * `key_value` must be a valid pointer to a `FoxgloveKeyValue` that will be filled in.
+ * The channel descriptor itself must still be valid.
+ */
+bool foxglove_channel_descriptor_metadata_iter_next(struct foxglove_channel_descriptor_metadata_iterator *iter,
+                                                    struct foxglove_key_value *key_value);
+
+/**
+ * Free a metadata iterator created via `foxglove_channel_descriptor_metadata_iter_create`.
+ *
+ * # Safety
+ * `iter` must be a valid pointer to a `foxglove_channel_descriptor_metadata_iterator` created via
+ * `foxglove_channel_descriptor_metadata_iter_create`.
+ */
+void foxglove_channel_descriptor_metadata_iter_free(struct foxglove_channel_descriptor_metadata_iterator *iter);
 
 /**
  * Create a new connection graph.
